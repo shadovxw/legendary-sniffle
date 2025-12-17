@@ -8,54 +8,59 @@ const pool = new Pool({
 
 export const initDB = async () => {
   try {
-    // Drop and recreate tables to ensure clean state
-    // Only drop assignments first (has foreign keys)
-    await pool.query(`DROP TABLE IF EXISTS assignments CASCADE;`);
+    console.log('Starting database initialization...');
     
-    // Create participants table
+    // Drop all tables in correct order (reverse of dependencies)
+    await pool.query(`DROP TABLE IF EXISTS assignments CASCADE;`);
+    console.log('✓ Dropped assignments table');
+    
+    await pool.query(`DROP TABLE IF EXISTS rounds CASCADE;`);
+    console.log('✓ Dropped rounds table');
+    
+    await pool.query(`DROP TABLE IF EXISTS participants CASCADE;`);
+    console.log('✓ Dropped participants table');
+
+    // Now create fresh tables
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS participants (
+      CREATE TABLE participants (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL
       );
     `);
-    
-    console.log('✓ Participants table ready');
+    console.log('✓ Created participants table');
 
-    // Create rounds table
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS rounds (
+      CREATE TABLE rounds (
         id SERIAL PRIMARY KEY,
         created_at TIMESTAMP DEFAULT NOW(),
         active BOOLEAN DEFAULT true
       );
     `);
-    
-    console.log('✓ Rounds table ready');
+    console.log('✓ Created rounds table');
 
-    // Create assignments table with foreign keys
     await pool.query(`
-      CREATE TABLE IF NOT EXISTS assignments (
+      CREATE TABLE assignments (
         token TEXT PRIMARY KEY,
-        round_id INT REFERENCES rounds(id) ON DELETE CASCADE,
-        participant_id INT REFERENCES participants(id) ON DELETE CASCADE,
+        round_id INTEGER NOT NULL REFERENCES rounds(id) ON DELETE CASCADE,
+        participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
         assigned_to TEXT NOT NULL,
         revealed BOOLEAN DEFAULT false
       );
     `);
+    console.log('✓ Created assignments table');
     
-    console.log('✓ Assignments table ready');
-    console.log('✓ Database initialized successfully');
+    console.log('✅ Database initialized successfully!');
     
   } catch (error) {
-    console.error('Database initialization error:', error);
+    console.error('❌ Database initialization error:', error.message);
+    console.error('Full error:', error);
     throw error;
   }
 };
 
 export const db = {
   addParticipant: (name) =>
-    pool.query(`INSERT INTO participants (name) VALUES ($1)`, [name]),
+    pool.query(`INSERT INTO participants (name) VALUES ($1) RETURNING *`, [name]),
 
   deleteParticipant: (id) =>
     pool.query(`DELETE FROM participants WHERE id=$1`, [id]),
