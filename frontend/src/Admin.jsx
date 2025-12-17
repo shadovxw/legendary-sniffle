@@ -255,17 +255,6 @@ export default function Admin() {
             ))}
           </div>
 
-          <div className="card">
-            <h2>📊 Reveal Status</h2>
-            {revealStatus.map((p, i) => (
-              <div key={i} className={p.revealed ? "revealed" : "not-revealed"}>
-                <span>{p.name}</span>
-                <span className="status-badge">
-                  {p.revealed ? "Revealed ✨" : "Pending"}
-                </span>
-              </div>
-            ))}
-          </div>
         </>
       )}
     </div>
