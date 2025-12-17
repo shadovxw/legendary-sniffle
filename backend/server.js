@@ -117,7 +117,7 @@ app.post("/admin/generate", (req, res) => {
 
   const links = db.participants.map(p => ({
     name: p.name,
-    link: `http://localhost:5173/reveal/${p.token}`
+    link: `https://secrect-santa.onrender.com/${p.token}`
   }));
 
   res.json(links);
@@ -199,7 +199,7 @@ app.get("/admin/links", (req, res) => {
 
   const links = db.participants.map(p => ({
     name: p.name,
-    link: `http://localhost:5173/reveal/${p.token}`
+    link: `https://secrect-santa.onrender.com/${p.token}`
   }));
 
   res.json({ locked: true, links });
