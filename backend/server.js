@@ -91,6 +91,17 @@ app.post("/reveal/:token/confirm", async (req, res) => {
   res.json({ success: true });
 });
 
+/* ---------- ACTIVE LINKS (FOR ADMIN) ---------- */
+app.get("/admin/links", async (_, res) => {
+  const { rows } = await db.getActiveLinks();
+  res.json(
+    rows.map(r => ({
+      name: r.name,
+      link: `https://secrect-santa.onrender.com/reveal/${r.token}`
+    }))
+  );
+});
+
 /* ---------- DASHBOARD ---------- */
 app.get("/dashboard", async (_, res) => {
   const { rows } = await db.dashboardStatus();

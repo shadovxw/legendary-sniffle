@@ -103,3 +103,14 @@ export const db = {
       ORDER BY p.name
     `)
 };
+
+export const getActiveLinks = () => {
+  return db.query(`
+    SELECT p.name, a.token
+    FROM assignments a
+    JOIN participants p ON p.id = a.participant_id
+    JOIN rounds r ON r.id = a.round_id
+    WHERE r.active = true
+    ORDER BY p.name
+  `);
+};

@@ -9,10 +9,17 @@ export default function Admin() {
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
-    const res = await fetch(`${API_BASE}/participants`);
-    const data = await res.json();
-    setList(data);
-  };
+  const p = await fetch(`${API_BASE}/participants`);
+  const participants = await p.json();
+  setList(participants);
+
+  const l = await fetch(`${API_BASE}/admin/links`);
+  if (l.ok) {
+    const links = await l.json();
+    setLinks(links);
+  }
+};
+
 
   useEffect(() => { load(); }, []);
 
