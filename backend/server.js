@@ -1,121 +1,89 @@
 import express from "express";
 import cors from "cors";
-import fs from "fs";
 import { v4 as uuid } from "uuid";
+import { db, initDB } from "./db.js";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const DB = "./data.json";
+/* ---------- INIT DB ---------- */
+initDB()
+  .then(() => console.log("Postgres connected"))
+  .catch(err => console.error(err));
 
-/* ---------- DB HELPERS ---------- */
-const readDB = () => {
-  return JSON.parse(fs.readFileSync(DB));
-};
-
-const writeDB = (data) => {
-  fs.writeFileSync(DB, JSON.stringify(data, null, 2));
-};
-
-/* ---------- Admin Login ---------- */
-app.post("/admin/login", (req, res) => {
+/* ---------- ADMIN LOGIN ---------- */
+app.post("/admin/login", async (req, res) => {
   const { username, password } = req.body;
-  const db = readDB();
 
-  if (username === db.admin.username && password === db.admin.password) {
+  const result = await db.getAdmin();
+  const admin = result.rows[0];
+
+  if (admin.username === username && admin.password === password) {
     return res.json({ success: true });
   }
 
   res.status(401).json({ success: false });
 });
 
-/* ---------- Add Names ---------- */
-app.post("/admin/add", (req, res) => {
+/* ---------- ADD PARTICIPANT ---------- */
+app.post("/admin/add", async (req, res) => {
   const { name } = req.body;
-  const db = readDB();
-
-  if (db.locked) {
-    return res.status(403).send("Locked");
-  }
 
   const participant = {
-    name,
     token: uuid(),
-    assignedTo: null,
-    revealed: false
+    name
   };
 
-  db.participants.push(participant);
-  writeDB(db);
-
+  await db.addParticipant(participant);
   res.json({ success: true });
 });
 
-/* ---------- Get Participants ---------- */
-app.get("/admin/list", (req, res) => {
-  const db = readDB();
-  const list = db.participants.map(p => ({ id: p.token, name: p.name }));
+/* ---------- LIST PARTICIPANTS ---------- */
+app.get("/admin/list", async (req, res) => {
+  const result = await db.listParticipants();
+  const list = result.rows.map(p => ({
+    id: p.token,
+    name: p.name
+  }));
+
   res.json(list);
 });
 
-/* ---------- Update Name ---------- */
-app.put("/admin/update", (req, res) => {
+/* ---------- UPDATE NAME ---------- */
+app.put("/admin/update", async (req, res) => {
   const { id, name } = req.body;
-  const db = readDB();
 
-  if (db.locked) {
-    return res.status(403).send("Locked");
-  }
-
-  const p = db.participants.find(p => p.token === id);
-  if (p) {
-    p.name = name;
-  }
-
-  writeDB(db);
+  await db.updateName(id, name);
   res.json({ success: true });
 });
 
-/* ---------- Delete Name ---------- */
-app.delete("/admin/delete/:id", (req, res) => {
-  const db = readDB();
-
-  if (db.locked) {
-    return res.status(403).send("Locked");
-  }
-
-  db.participants = db.participants.filter(
-    p => p.token !== req.params.id
-  );
-
-  writeDB(db);
+/* ---------- DELETE NAME ---------- */
+app.delete("/admin/delete/:id", async (req, res) => {
+  await db.deleteParticipant(req.params.id);
   res.json({ success: true });
 });
 
-/* ---------- Generate & Lock ---------- */
-app.post("/admin/generate", (req, res) => {
-  const db = readDB();
-  if (db.locked) {
-    return res.status(400).json({ error: "Already locked" });
-  }
+/* ---------- GENERATE & LOCK ---------- */
+app.post("/admin/generate", async (req, res) => {
+  const result = await db.listParticipants();
+  const participants = result.rows;
 
-  const names = db.participants.map(p => p.name);
+  const names = participants.map(p => p.name);
   let shuffled;
 
   do {
     shuffled = [...names].sort(() => Math.random() - 0.5);
   } while (shuffled.some((n, i) => n === names[i]));
 
-  db.participants.forEach((p, i) => {
-    p.assignedTo = shuffled[i];
-    p.revealed = false;
-  });
+  const pairs = participants.map((p, i) => ({
+    token: p.token,
+    assignedTo: shuffled[i]
+  }));
 
-  db.locked = true;
-  writeDB(db);
+  await db.lockAssign(pairs);
 
-  const links = db.participants.map(p => ({
+  const links = participants.map(p => ({
     name: p.name,
     link: `https://secrect-santa.onrender.com/reveal/${p.token}`
   }));
@@ -123,24 +91,10 @@ app.post("/admin/generate", (req, res) => {
   res.json(links);
 });
 
-/* ---------- Regenerate ---------- */
-app.post("/admin/regenerate", (req, res) => {
-  const db = readDB();
-
-  db.locked = false;
-  db.participants.forEach(p => {
-    p.assignedTo = null;
-    p.revealed = false;
-  });
-
-  writeDB(db);
-  res.json({ success: true });
-});
-
 /* ---------- CHECK LINK (NO REVEAL) ---------- */
-app.get("/reveal/:token", (req, res) => {
-  const db = readDB();
-  const person = db.participants.find(p => p.token === req.params.token);
+app.get("/reveal/:token", async (req, res) => {
+  const result = await db.listParticipants();
+  const person = result.rows.find(p => p.token === req.params.token);
 
   if (!person) {
     return res.status(404).json({ error: "invalid_link" });
@@ -152,14 +106,14 @@ app.get("/reveal/:token", (req, res) => {
 
   res.json({
     canReveal: true,
-    assignedTo: person.assignedTo
+    assignedTo: person.assigned_to
   });
 });
 
 /* ---------- CONFIRM REVEAL ---------- */
-app.post("/reveal/:token/confirm", (req, res) => {
-  const db = readDB();
-  const person = db.participants.find(p => p.token === req.params.token);
+app.post("/reveal/:token/confirm", async (req, res) => {
+  const result = await db.listParticipants();
+  const person = result.rows.find(p => p.token === req.params.token);
 
   if (!person) {
     return res.status(404).json({ error: "invalid_link" });
@@ -169,19 +123,19 @@ app.post("/reveal/:token/confirm", (req, res) => {
     return res.status(403).json({ error: "already_revealed" });
   }
 
-  person.revealed = true;
-  writeDB(db);
+  await db.markRevealed(req.params.token);
 
   res.json({
     success: true,
-    assignedTo: person.assignedTo
+    assignedTo: person.assigned_to
   });
 });
 
-/* ---------- Admin Status ---------- */
-app.get("/admin/status", (req, res) => {
-  const db = readDB();
-  const status = db.participants.map(p => ({
+/* ---------- ADMIN STATUS ---------- */
+app.get("/admin/status", async (req, res) => {
+  const result = await db.listParticipants();
+
+  const status = result.rows.map(p => ({
     name: p.name,
     revealed: p.revealed
   }));
@@ -189,20 +143,19 @@ app.get("/admin/status", (req, res) => {
   res.json(status);
 });
 
-/* ---------- Admin Links ---------- */
-app.get("/admin/links", (req, res) => {
-  const db = readDB();
+/* ---------- ADMIN LINKS ---------- */
+app.get("/admin/links", async (req, res) => {
+  const result = await db.listParticipants();
 
-  if (!db.locked) {
-    return res.status(400).json({ error: "Not yet generated" });
-  }
-
-  const links = db.participants.map(p => ({
+  const links = result.rows.map(p => ({
     name: p.name,
     link: `https://secrect-santa.onrender.com/reveal/${p.token}`
   }));
 
-  res.json({ locked: true, links });
+  res.json({ links });
 });
 
-app.listen(4000);
+/* ---------- START ---------- */
+app.listen(4000, () => {
+  console.log("Server running on port 4000");
+});
