@@ -7,18 +7,23 @@ const pool = new Pool({
 });
 
 export const initDB = async () => {
+  // Create tables separately to ensure they exist before foreign keys are added
   await pool.query(`
     CREATE TABLE IF NOT EXISTS participants (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL
     );
+  `);
 
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS rounds (
       id SERIAL PRIMARY KEY,
       created_at TIMESTAMP DEFAULT NOW(),
       active BOOLEAN DEFAULT true
     );
+  `);
 
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS assignments (
       token TEXT PRIMARY KEY,
       round_id INT REFERENCES rounds(id),
