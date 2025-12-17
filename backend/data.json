@@ -3,13 +3,13 @@
     "username": "admin",
     "password": "santa2024"
   },
-  "locked": true,
+  "locked": false,
   "participants": [
     {
       "name": "Ramesh Madhavan",
       "token": "ram001-madhavan-2024",
       "assignedTo": "Vaishnavi Warrier",
-      "revealed": true
+      "revealed": false
     },
     {
       "name": "Priya Ramesh",
@@ -27,7 +27,7 @@
       "name": "Vrishank Warrier",
       "token": "vri004-warrier-2024",
       "assignedTo": "Umesh Kutty",
-      "revealed": true
+      "revealed": false
     },
     {
       "name": "Sunitha A",
@@ -51,7 +51,7 @@
       "name": "Shruti Warrier",
       "token": "shr008-warrier-2024",
       "assignedTo": "Usha Devdas",
-      "revealed": true
+      "revealed": false
     },
     {
       "name": "Sujatha",
