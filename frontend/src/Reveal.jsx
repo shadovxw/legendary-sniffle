@@ -77,6 +77,10 @@ export default function Reveal() {
               </div>
               <h1>Ready to discover your Secret Santa assignment?</h1>
               <p className="hint">Click the button below to reveal who you're gifting to!</p>
+              <div className="warning-box">
+                <span className="warning-icon">⚠️</span>
+                <p className="warning-text">You can only reveal this assignment once! Make sure you're ready.</p>
+              </div>
               <button onClick={reveal} className="reveal-button">
                 <span className="button-icon">🎄</span>
                 <span>Reveal My Assignment</span>

@@ -122,12 +122,13 @@ export default function Admin() {
                   </div>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(l.link);
-                      alert(`Link copied for ${l.name}!`);
+                      const message = `Hello ${l.name}! 🎅🎄\n\nYou've been invited to participate in Secret Santa!\n\nClick the link below to find out who you're buying a gift for:\n\n${l.link}\n\nKeep it secret! 🎁`;
+                      navigator.clipboard.writeText(message);
+                      alert(`Message copied for ${l.name}!`);
                     }}
                     className="btn-copy"
                   >
-                    📋 Copy Link
+                    📋 Copy Message
                   </button>
                 </div>
               ))}
