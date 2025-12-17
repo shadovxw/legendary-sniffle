@@ -6,53 +6,71 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-/* ---------- INIT TABLE ---------- */
 export const initDB = async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS participants (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS rounds (
+      id SERIAL PRIMARY KEY,
+      created_at TIMESTAMP DEFAULT NOW(),
+      active BOOLEAN DEFAULT true
+    );
+
+    CREATE TABLE IF NOT EXISTS assignments (
       token TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      assigned_to TEXT,
+      round_id INT REFERENCES rounds(id),
+      participant_id INT REFERENCES participants(id),
+      assigned_to TEXT NOT NULL,
       revealed BOOLEAN DEFAULT false
-    )
+    );
   `);
 };
 
-/* ---------- QUERIES ---------- */
 export const db = {
-  addParticipant: (token, name) =>
-    pool.query(
-      `INSERT INTO participants (token, name) VALUES ($1,$2)`,
-      [token, name]
-    ),
+  addParticipant: (name) =>
+    pool.query(`INSERT INTO participants (name) VALUES ($1)`, [name]),
+
+  deleteParticipant: (id) =>
+    pool.query(`DELETE FROM participants WHERE id=$1`, [id]),
 
   listParticipants: () =>
-    pool.query(`SELECT * FROM participants`),
+    pool.query(`SELECT * FROM participants ORDER BY name`),
 
-  getParticipantByToken: (token) =>
+  deactivateRounds: () =>
+    pool.query(`UPDATE rounds SET active=false`),
+
+  createRound: () =>
+    pool.query(`INSERT INTO rounds DEFAULT VALUES RETURNING id`),
+
+  createAssignment: (token, roundId, participantId, assignedTo) =>
     pool.query(
-      `SELECT * FROM participants WHERE token=$1`,
-      [token]
+      `INSERT INTO assignments
+       (token, round_id, participant_id, assigned_to)
+       VALUES ($1,$2,$3,$4)`,
+      [token, roundId, participantId, assignedTo]
     ),
 
-  deleteAll: () =>
-    pool.query(`DELETE FROM participants`),
-
-  lockAssign: (pairs) =>
-    Promise.all(
-      pairs.map(p =>
-        pool.query(
-          `UPDATE participants
-           SET assigned_to=$1, revealed=false
-           WHERE token=$2`,
-          [p.assignedTo, p.token]
-        )
-      )
-    ),
+  getReveal: (token) =>
+    pool.query(`
+      SELECT a.*, r.active
+      FROM assignments a
+      JOIN rounds r ON r.id = a.round_id
+      WHERE a.token=$1
+    `, [token]),
 
   markRevealed: (token) =>
-    pool.query(
-      `UPDATE participants SET revealed=true WHERE token=$1`,
-      [token]
-    )
+    pool.query(`UPDATE assignments SET revealed=true WHERE token=$1`, [token]),
+
+  dashboardStatus: () =>
+    pool.query(`
+      SELECT p.name, a.revealed
+      FROM assignments a
+      JOIN participants p ON p.id = a.participant_id
+      JOIN rounds r ON r.id = a.round_id
+      WHERE r.active=true
+      ORDER BY p.name
+    `)
 };

@@ -1,126 +1,68 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
-import "./style.css";
 
 const api = axios.create({
-  baseURL: "https://secrect-santa-backend.onrender.com",
-  headers: { "Content-Type": "application/json" }
+  baseURL: "https://secrect-santa-backend.onrender.com"
 });
 
 export default function Admin() {
   const [name, setName] = useState("");
   const [list, setList] = useState([]);
   const [links, setLinks] = useState([]);
-  const [isLocked, setIsLocked] = useState(false);
 
-  /* ---------- LOAD PARTICIPANTS ---------- */
-  const loadList = async () => {
-    const { data } = await api.get("/list");
+  const load = async () => {
+    const { data } = await api.get("/participants");
     setList(data);
   };
 
-  useEffect(() => {
-    loadList();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  /* ---------- ADD NAME ---------- */
-  const addName = async () => {
-    if (!name.trim()) return;
-    await api.post("/add", { name: name.trim() });
+  const add = async () => {
+    await api.post("/participants", { name });
     setName("");
-    loadList();
+    load();
   };
 
-  /* ---------- GENERATE ---------- */
+  const del = async (id) => {
+    await api.delete(`/participants/${id}`);
+    load();
+  };
+
   const generate = async () => {
     const { data } = await api.post("/generate");
     setLinks(data);
-    setIsLocked(true);
-  };
-
-  /* ---------- RESET ---------- */
-  const resetAll = async () => {
-    const confirmed = window.confirm(
-      "⚠️ This will remove all names and links. Continue?"
-    );
-    if (!confirmed) return;
-
-    await api.post("/reset");
-    setLinks([]);
-    setIsLocked(false);
-    loadList();
-  };
-
-  /* ---------- COPY MESSAGE ---------- */
-  const copyToClipboard = (link) => {
-    const message = `Hey! 🎄
-This is your Secret Santa link.
-
-Please open it only when you’re ready — once revealed, it can’t be opened again.
-
-👉 ${link}
-
-Happy gifting! 🎁`;
-
-    navigator.clipboard.writeText(message);
   };
 
   return (
     <div className="container">
-      {!isLocked ? (
-        <>
-          <div className="card">
-            <h2>➕ Add Participant</h2>
-            <div className="row">
-              <input
-                placeholder="Enter name"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                onKeyPress={e => e.key === "Enter" && addName()}
-              />
-              <button onClick={addName}>Add</button>
-            </div>
-          </div>
+      <h1>Admin</h1>
 
-          <div className="card">
-            <h2>👥 Participants ({list.length})</h2>
-            {list.map(p => (
-              <div key={p.token} className="list-item">
-                <span>{p.name}</span>
-              </div>
-            ))}
-          </div>
+      <input
+        value={name}
+        onChange={e => setName(e.target.value)}
+        placeholder="Name"
+      />
+      <button onClick={add}>Add</button>
 
-          {list.length >= 3 && (
-            <div className="card">
-              <button className="primary full" onClick={generate}>
-                🎁 Generate & Lock
-              </button>
-            </div>
-          )}
-        </>
-      ) : (
-        <div className="card">
-          <h2>🎅 Secret Santa Generated</h2>
-          <button className="regenerate" onClick={resetAll}>
-            🔄 Reset for Next Time
+      {list.map(p => (
+        <div key={p.id}>
+          {p.name}
+          <button onClick={() => del(p.id)}>❌</button>
+        </div>
+      ))}
+
+      <button onClick={generate}>🎁 Generate</button>
+
+      {links.map(l => (
+        <div key={l.name}>
+          {l.name}
+          <button onClick={() =>
+            navigator.clipboard.writeText(l.link)
+          }>
+            Copy Link
           </button>
         </div>
-      )}
-
-      {links.length > 0 && (
-        <div className="card">
-          <h2>🔗 Share Links</h2>
-          {links.map(l => (
-            <div key={l.name} className="link-box">
-              <strong>{l.name}</strong>
-              <button onClick={() => copyToClipboard(l.link)}>
-                Copy
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      ))}
     </div>
   );
 }

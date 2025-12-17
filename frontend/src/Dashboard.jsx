@@ -1,43 +1,32 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import "./style.css";
 
 const api = axios.create({
-  baseURL: "https://secrect-santa-backend.onrender.com",
-  headers: { "Content-Type": "application/json" }
+  baseURL: "https://secrect-santa-backend.onrender.com"
 });
 
 export default function Dashboard() {
-  const [revealStatus, setRevealStatus] = useState([]);
+  const [status, setStatus] = useState([]);
+
+  const load = async () => {
+    const { data } = await api.get("/dashboard");
+    setStatus(data);
+  };
 
   useEffect(() => {
-    loadStatus();
-    const interval = setInterval(loadStatus, 5000); // auto-refresh
-    return () => clearInterval(interval);
+    load();
+    const i = setInterval(load, 5000);
+    return () => clearInterval(i);
   }, []);
-
-  const loadStatus = async () => {
-    const { data } = await api.get("/admin/status");
-    setRevealStatus(data);
-  };
 
   return (
     <div className="container">
-      <h1>📊 Dashboard</h1>
-
-      <div className="card">
-        {revealStatus.map((p, i) => (
-          <div
-            key={i}
-            className={p.revealed ? "revealed" : "not-revealed"}
-          >
-            <span>{p.name}</span>
-            <span className="status-badge">
-              {p.revealed ? "Revealed ✨" : "Pending"}
-            </span>
-          </div>
-        ))}
-      </div>
+      <h1>Dashboard</h1>
+      {status.map(s => (
+        <div key={s.name}>
+          {s.name} — {s.revealed ? "✅ Revealed" : "⏳ Pending"}
+        </div>
+      ))}
     </div>
   );
 }

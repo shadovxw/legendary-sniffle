@@ -7,110 +7,97 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* ---------- INIT DB ---------- */
-initDB()
-  .then(() => console.log("Postgres connected"))
-  .catch(console.error);
+await initDB();
 
-/* ---------- ADD NAME (MANUAL UPLOAD) ---------- */
-app.post("/add", async (req, res) => {
+/* ---------- PARTICIPANTS ---------- */
+app.get("/participants", async (_, res) => {
+  const { rows } = await db.listParticipants();
+  res.json(rows);
+});
+
+app.post("/participants", async (req, res) => {
   const { name } = req.body;
-
-  if (!name) {
-    return res.status(400).json({ error: "name_required" });
-  }
-
-  const token = uuid();
-  await db.addParticipant(token, name);
-
+  if (!name) return res.status(400).json({ error: "name_required" });
+  await db.addParticipant(name);
   res.json({ success: true });
 });
 
-/* ---------- LIST (FOR ADMIN UI) ---------- */
-app.get("/list", async (req, res) => {
-  const result = await db.listParticipants();
-  res.json(result.rows);
+app.delete("/participants/:id", async (req, res) => {
+  await db.deleteParticipant(req.params.id);
+  res.json({ success: true });
 });
 
-/* ---------- GENERATE & LOCK ---------- */
-app.post("/generate", async (req, res) => {
-  const result = await db.listParticipants();
-  const participants = result.rows;
+/* ---------- GENERATE ROUND ---------- */
+app.post("/generate", async (_, res) => {
+  await db.deactivateRounds();
+  const round = await db.createRound();
+  const roundId = round.rows[0].id;
 
-  if (participants.length < 2) {
+  const { rows: people } = await db.listParticipants();
+  if (people.length < 2)
     return res.status(400).json({ error: "not_enough_participants" });
-  }
 
-  const names = participants.map(p => p.name);
+  const names = people.map(p => p.name);
   let shuffled;
-
   do {
     shuffled = [...names].sort(() => Math.random() - 0.5);
   } while (shuffled.some((n, i) => n === names[i]));
 
-  const pairs = participants.map((p, i) => ({
-    token: p.token,
-    assignedTo: shuffled[i]
-  }));
+  const links = [];
 
-  await db.lockAssign(pairs);
+  for (let i = 0; i < people.length; i++) {
+    const token = uuid();
+    await db.createAssignment(
+      token,
+      roundId,
+      people[i].id,
+      shuffled[i]
+    );
 
-  const links = participants.map(p => ({
-    name: p.name,
-    link: `https://YOUR-RENDER-URL.onrender.com/reveal/${p.token}`
-  }));
+    links.push({
+      name: people[i].name,
+      link: `https://secrect-santa.onrender.com/reveal/${token}`
+    });
+  }
 
   res.json(links);
 });
 
-/* ---------- CHECK LINK (NO REVEAL) ---------- */
+/* ---------- REVEAL ---------- */
 app.get("/reveal/:token", async (req, res) => {
-  const result = await db.getParticipantByToken(req.params.token);
-  const person = result.rows[0];
+  const { rows } = await db.getReveal(req.params.token);
+  const a = rows[0];
 
-  if (!person) {
-    return res.status(404).json({ error: "invalid_link" });
-  }
+  if (!a || !a.active)
+    return res.status(404).json({ error: "expired_link" });
 
-  if (person.revealed) {
+  if (a.revealed)
     return res.status(403).json({ error: "already_revealed" });
-  }
 
-  res.json({
-    canReveal: true,
-    assignedTo: person.assigned_to
-  });
+  res.json({ assignedTo: a.assigned_to });
 });
 
-/* ---------- CONFIRM REVEAL ---------- */
 app.post("/reveal/:token/confirm", async (req, res) => {
-  const result = await db.getParticipantByToken(req.params.token);
-  const person = result.rows[0];
+  const { rows } = await db.getReveal(req.params.token);
+  const a = rows[0];
 
-  if (!person) {
-    return res.status(404).json({ error: "invalid_link" });
-  }
+  if (!a || !a.active)
+    return res.status(404).json({ error: "expired_link" });
 
-  if (person.revealed) {
+  if (a.revealed)
     return res.status(403).json({ error: "already_revealed" });
-  }
 
   await db.markRevealed(req.params.token);
-
-  res.json({
-    success: true,
-    assignedTo: person.assigned_to
-  });
-});
-
-/* ---------- RESET (OPTIONAL) ---------- */
-app.post("/reset", async (req, res) => {
-  await db.deleteAll();
   res.json({ success: true });
 });
 
-/* ---------- START ---------- */
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log("Server running on port", PORT);
+/* ---------- DASHBOARD ---------- */
+app.get("/dashboard", async (_, res) => {
+  const { rows } = await db.dashboardStatus();
+  res.json(rows);
 });
+
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () =>
+  console.log("Server running on", PORT)
+);
