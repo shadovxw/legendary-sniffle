@@ -7,31 +7,50 @@ const pool = new Pool({
 });
 
 export const initDB = async () => {
-  // Create tables separately to ensure they exist before foreign keys are added
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS participants (
-      id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL
-    );
-  `);
+  try {
+    // Drop and recreate tables to ensure clean state
+    // Only drop assignments first (has foreign keys)
+    await pool.query(`DROP TABLE IF EXISTS assignments CASCADE;`);
+    
+    // Create participants table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS participants (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL
+      );
+    `);
+    
+    console.log('✓ Participants table ready');
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS rounds (
-      id SERIAL PRIMARY KEY,
-      created_at TIMESTAMP DEFAULT NOW(),
-      active BOOLEAN DEFAULT true
-    );
-  `);
+    // Create rounds table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS rounds (
+        id SERIAL PRIMARY KEY,
+        created_at TIMESTAMP DEFAULT NOW(),
+        active BOOLEAN DEFAULT true
+      );
+    `);
+    
+    console.log('✓ Rounds table ready');
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS assignments (
-      token TEXT PRIMARY KEY,
-      round_id INT REFERENCES rounds(id),
-      participant_id INT REFERENCES participants(id),
-      assigned_to TEXT NOT NULL,
-      revealed BOOLEAN DEFAULT false
-    );
-  `);
+    // Create assignments table with foreign keys
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS assignments (
+        token TEXT PRIMARY KEY,
+        round_id INT REFERENCES rounds(id) ON DELETE CASCADE,
+        participant_id INT REFERENCES participants(id) ON DELETE CASCADE,
+        assigned_to TEXT NOT NULL,
+        revealed BOOLEAN DEFAULT false
+      );
+    `);
+    
+    console.log('✓ Assignments table ready');
+    console.log('✓ Database initialized successfully');
+    
+  } catch (error) {
+    console.error('Database initialization error:', error);
+    throw error;
+  }
 };
 
 export const db = {
