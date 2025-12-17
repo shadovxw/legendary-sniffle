@@ -3,7 +3,7 @@ import axios from "axios";
 import "./style.css";
 
 const api = axios.create({
-  baseURL: "https://legendary-sniffle-t8p7.onrender.com",
+  baseURL: "https://secrect-santa-backend.onrender.com",
   headers: { "Content-Type": "application/json" }
 });
 
