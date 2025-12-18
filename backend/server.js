@@ -18,6 +18,7 @@ app.get("/participants", async (_, res) => {
 app.post("/participants", async (req, res) => {
   const { name } = req.body;
   if (!name) return res.status(400).json({ error: "name_required" });
+
   await db.addParticipant(name);
   res.json({ success: true });
 });
@@ -27,7 +28,7 @@ app.delete("/participants/:id", async (req, res) => {
   res.json({ success: true });
 });
 
-/* ---------- GENERATE ROUND ---------- */
+/* ---------- GENERATE ---------- */
 app.post("/generate", async (_, res) => {
   await db.deactivateRounds();
   const round = await db.createRound();
@@ -39,6 +40,7 @@ app.post("/generate", async (_, res) => {
 
   const names = people.map(p => p.name);
   let shuffled;
+
   do {
     shuffled = [...names].sort(() => Math.random() - 0.5);
   } while (shuffled.some((n, i) => n === names[i]));
@@ -47,6 +49,7 @@ app.post("/generate", async (_, res) => {
 
   for (let i = 0; i < people.length; i++) {
     const token = uuid();
+
     await db.createAssignment(
       token,
       roundId,
@@ -63,7 +66,7 @@ app.post("/generate", async (_, res) => {
   res.json(links);
 });
 
-/* ---------- REVEAL ---------- */
+/* ---------- REVEAL (MULTI-VIEW ALLOWED) ---------- */
 app.get("/reveal/:token", async (req, res) => {
   const { rows } = await db.getReveal(req.params.token);
   const a = rows[0];
@@ -71,27 +74,10 @@ app.get("/reveal/:token", async (req, res) => {
   if (!a || !a.active)
     return res.status(404).json({ error: "expired_link" });
 
-  if (a.revealed)
-    return res.status(403).json({ error: "already_revealed" });
-
   res.json({ assignedTo: a.assigned_to });
 });
 
-app.post("/reveal/:token/confirm", async (req, res) => {
-  const { rows } = await db.getReveal(req.params.token);
-  const a = rows[0];
-
-  if (!a || !a.active)
-    return res.status(404).json({ error: "expired_link" });
-
-  if (a.revealed)
-    return res.status(403).json({ error: "already_revealed" });
-
-  await db.markRevealed(req.params.token);
-  res.json({ success: true });
-});
-
-/* ---------- ACTIVE LINKS (FOR ADMIN) ---------- */
+/* ---------- ADMIN ---------- */
 app.get("/admin/links", async (_, res) => {
   const { rows } = await db.getActiveLinks();
   res.json(
@@ -110,5 +96,5 @@ app.get("/dashboard", async (_, res) => {
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () =>
-  console.log("Server running on", PORT)
+  console.log("🚀 Server running on", PORT)
 );
